@@ -436,6 +436,11 @@ public class JdbcDataSource extends NamedDataSource {
                     currentThread.setContextClassLoader(loader);
 
                     // FIXME not thread-safe
+
+                    // TODO: test query "SELECT 1" won't work for Oracle
+                    if (driverClassName.equals("oracle.jdbc.OracleDriver")) {
+                        props.setProperty("connectionTestQuery", "SELECT 1 FROM DUAL");
+                    }
                     HikariConfig conf = new HikariConfig(props);
                     conf.setMetricRegistry(Utils.getDefaultMetricRegistry());
                     this.datasource = new HikariDataSource(conf);
@@ -443,6 +448,10 @@ public class JdbcDataSource extends NamedDataSource {
                     currentThread.setContextClassLoader(currentContextClassLoader);
                 }
             } else {
+                String driverClassName = props.getProperty(PROP_DRIVER_CLASS);
+                if (driverClassName.equals("oracle.jdbc.OracleDriver")) {
+                    props.setProperty("connectionTestQuery", "SELECT 1 FROM DUAL");
+                }
                 HikariConfig conf = new HikariConfig(props);
                 conf.setMetricRegistry(Utils.getDefaultMetricRegistry());
                 this.datasource = new HikariDataSource(conf);
@@ -468,6 +477,8 @@ public class JdbcDataSource extends NamedDataSource {
         }
 
         try {
+            // TODO: Oracle server requires the key & value pair
+            //  for the client info to follow a specific format, https://docs.oracle.com/en/database/oracle/oracle-database/19/jjdbc/JDBC-standards-support.html#GUID-1987FAC4-E93A-49A5-9EB4-A78B465E6938
             conn.setClientInfo(PROP_CLIENT_NAME, DEFAULT_CLIENT_NAME);
         } catch (Throwable e) {
             log.warn("Failed call setClientInfo due to {}", e.getMessage());
@@ -830,27 +841,14 @@ public class JdbcDataSource extends NamedDataSource {
         if (this.quoteIdentifier == null) {
             synchronized (this) {
                 if (this.quoteIdentifier == null) {
-                    this.quoteIdentifier = DEFAULT_QUOTE_IDENTIFIER;
-
-                    String errorMsg = "Failed to get identifier quote string due to {}";
-                    String str = null;
-                    if (conn != null) {
-                        try {
-                            str = conn.getMetaData().getIdentifierQuoteString();
-                        } catch (Exception e) {
-                            log.warn(errorMsg, e.getMessage());
-                        }
-                    } else {
-                        try (Connection c = getConnection()) {
-                            str = c.getMetaData().getIdentifierQuoteString();
-                        } catch (Exception e) {
-                            log.warn(errorMsg, e.getMessage());
-                        }
-                    }
-
-                    if (str != null && !str.trim().isEmpty()) {
-                        this.quoteIdentifier = str;
-                    }
+                    this.quoteIdentifier = "";
+                    // TODO: conn.getMetaData().getIdentifierQuoteString() will return the supported quote string
+                    //  for a given driver. However, Since the quote interpretation depends on the underlying database
+                    //  implementations.
+                    //  Having this quote string to build the query for all underlying DBMS, will require the the origin
+                    //  datasource use quote to create the origin SQL identifiers(e.g., table, column names), which is not
+                    //  a good practise for almost every DBMS.
+                    //  Maybe we should expose an options to the user so that he can decide if a datasource needs to quote or not.
                 }
             }
         }

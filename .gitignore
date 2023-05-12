@@ -9,3 +9,5 @@ demo/
 target/
 test.sh
 test-dir/
+.idea
+jdbc-bridge/

@@ -67,6 +67,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.ResponseContentTypeHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
 import io.vertx.micrometer.MicrometerMetricsOptions;
@@ -254,6 +255,10 @@ public class JdbcBridgeVerticle extends AbstractVerticle implements ExtensionMan
         // https://github.com/vert-x3/vertx-examples/blob/master/web-examples/src/main/java/io/vertx/example/web/mongo/Server.java
         Router router = Router.router(vertx);
 
+        // Configure the LoggerHandler for access logging
+        LoggerHandler loggerHandler = LoggerHandler.create();
+        router.route().handler(loggerHandler);
+
         router.route("/metrics").handler(PrometheusScrapingHandler.create());
 
         router.route().handler(BodyHandler.create()).handler(this::responseHandlers)
@@ -318,7 +323,7 @@ public class JdbcBridgeVerticle extends AbstractVerticle implements ExtensionMan
     }
 
     private void errorHandler(RoutingContext ctx) {
-        log.error("Failed to respond", ctx.failure());
+        log.error("Failed to respond: {}", ctx.failure().getMessage());
         ctx.response().setStatusCode(500).end(ctx.failure().getMessage());
     }
 

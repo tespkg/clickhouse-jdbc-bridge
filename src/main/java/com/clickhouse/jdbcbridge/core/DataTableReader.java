@@ -158,9 +158,10 @@ public interface DataTableReader {
 
                 ColumnDefinition column = requestColumns[colIndex];
 
+                boolean isNull = isNull(rowCount, index, column);
                 if (column.isNullable()) {
                     // FIXME what if it's large object(e.g. blob, clob etc.)?
-                    if (isNull(rowCount, index, column)) {
+                    if (isNull) {
                         if (params.nullAsDefault()) {
                             // column.writeValueTo(buffer);
                             buffer.writeNonNull().writeDefaultValue(column, defaultValues);
@@ -171,6 +172,17 @@ public interface DataTableReader {
                     } else {
                         buffer.writeNonNull();
                     }
+                }
+
+                // TODO: prefer to use default value?
+                //  In most case nullable column are very common OLTP workload as well.
+                //  To make creating schema in clickhouse less painful, should we prefer
+                //  to use the default value when the value is null in origin datasource,
+                //  or should we have an options to allow the user to config if he want an
+                //  error or use the default value instead.
+                if (isNull) {
+                    buffer.writeDefaultValue(column, defaultValues);
+                    continue;
                 }
 
                 read(rowCount, index, column, buffer);
